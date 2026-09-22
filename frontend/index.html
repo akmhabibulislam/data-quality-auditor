@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Automated Data Quality Auditor - Enterprise</title>
+  <link rel="stylesheet" href="/static/css/styles.css">
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
+</head>
+<body>
+
+  <!-- Loading Overlay -->
+  <div id="loader-overlay" class="loader-overlay">
+    <div class="loader-box">
+      <div class="spinner"></div>
+      <div id="loader-message" style="font-size: 13px; font-weight: 600; color: var(--text-main);">Processing dataset...</div>
+    </div>
+  </div>
+
+  <div class="app-container">
+    
+    <!-- Top Header -->
+    <header class="top-header">
+      <div class="brand-section">
+        <div class="brand-title">Data Quality Auditor</div>
+        <span class="brand-tag">Enterprise Edition v2.0</span>
+      </div>
+      <div class="header-controls">
+        <!-- Configuration Controls -->
+        <div style="display: flex; align-items: center; gap: 8px; margin-right: 12px;">
+          <label style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-muted);">IQR Multiplier:</label>
+          <select id="config-iqr" style="padding: 4px 8px; font-size: 11px; font-family: var(--font-mono);">
+            <option value="1.5" selected>1.5 (Standard)</option>
+            <option value="2.0">2.0 (Conservative)</option>
+            <option value="3.0">3.0 (Extreme Only)</option>
+          </select>
+
+          <label style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-left: 6px;">Z-Score:</label>
+          <select id="config-zscore" style="padding: 4px 8px; font-size: 11px; font-family: var(--font-mono);">
+            <option value="2.5">2.5 (|Z| &ge; 2.5)</option>
+            <option value="3.0" selected>3.0 (|Z| &ge; 3.0)</option>
+            <option value="3.5">3.5 (|Z| &ge; 3.5)</option>
+          </select>
+        </div>
+
+        <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-muted);">Theme:</span>
+        <div class="btn-group">
+          <button id="theme-light-btn" class="active">Light</button>
+          <button id="theme-dark-btn">Dark</button>
+          <button id="theme-system-btn">Contrast</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Ingestion Area -->
+    <section class="ingestion-panel">
+      <div id="drop-zone" class="drop-zone">
+        <input type="file" id="file-input" style="display: none;" accept=".csv,.tsv,.json,.parquet,.pq">
+        <div class="drop-zone-title">Upload Dataset for Vectorized Audit</div>
+        <div class="drop-zone-meta">Supports CSV, TSV, JSON, and Parquet up to 500MB with multi-encoding fallback and auto-delimiter sniffing</div>
+      </div>
+      <div class="samples-strip">
+        <span class="samples-label">Quick Benchmarks:</span>
+        <button id="sample-btn-ecommerce" class="btn-secondary">Load E-Commerce Dirty Sample</button>
+        <button id="sample-btn-sensors" class="btn-secondary">Load IoT Sensor Anomaly Sample</button>
+      </div>
+    </section>
+
+    <!-- Dashboard Section -->
+    <main id="dashboard-section" style="display: none;">
+      
+      <!-- Executive KPI Cards -->
+      <section class="metrics-grid">
+        <div class="metric-card">
+          <div class="metric-label">Dataset Health Score</div>
+          <div class="metric-value">
+            <span id="kpi-score-val">--</span>
+            <span id="kpi-score-grade" style="font-size: 14px; color: var(--text-muted);">Grade --</span>
+          </div>
+          <div class="metric-sub">Weighted quality composite (0-100)</div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-label">Dimensions</div>
+          <div class="metric-value" id="kpi-dims-val">--</div>
+          <div class="metric-sub">Rows × Columns (Vectorized)</div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-label">Missing Data Rate</div>
+          <div class="metric-value" id="kpi-missing-val">--</div>
+          <div class="metric-sub">Aggregate cell null frequency</div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-label">Duplicate Rows</div>
+          <div class="metric-value" id="kpi-dup-val">--</div>
+          <div class="metric-sub">Exact duplicate record count</div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-label">Primary Key Candidate</div>
+          <div class="metric-value" id="kpi-keys-val" style="font-size: 15px;">--</div>
+          <div class="metric-sub">100% unique & non-null</div>
+        </div>
+      </section>
+
+      <!-- Findings & Missing Pattern Matrix -->
+      <div class="charts-grid" style="margin-bottom: 20px;">
+        <div class="metric-card">
+          <div class="metric-label">Automated Findings & Quality Assessment</div>
+          <div id="recommendations-list"></div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Missing Data Mechanism Analysis</div>
+          <div style="margin-bottom: 8px; font-weight: 700; font-size: 13px;" id="missing-pattern-title">--</div>
+          <div style="font-size: 12px; color: var(--text-muted); line-height: 1.5;" id="missing-pattern-desc">--</div>
+          <div id="missing-pattern-pairs" style="margin-top: 10px; font-size: 11px;"></div>
+        </div>
+      </div>
+
+      <!-- Action Bar -->
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+        <div class="brand-title" style="font-size: 13px;">Analytical Profile, Statistical Distributions & Remediation</div>
+        <div style="display: flex; gap: 8px;">
+          <button id="export-json-btn" class="btn-secondary">Export JSON</button>
+          <button id="export-html-btn" class="btn-secondary">Export HTML Dossier</button>
+          <button id="export-pdf-btn" class="btn-primary">Export PDF Report</button>
+        </div>
+      </div>
+
+      <!-- Charts Grid -->
+      <section class="charts-grid">
+        <div class="chart-card">
+          <div class="chart-header">Column Missingness Distribution (%)</div>
+          <div id="chart-missingness" class="chart-box"></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-header">Statistical Outlier Frequency (IQR vs Robust MAD)</div>
+          <div id="chart-outliers" class="chart-box"></div>
+        </div>
+      </section>
+
+      <!-- Analysis Tabs -->
+      <div class="tabs-container">
+        <button class="tab-btn active" data-tab="tab-overview">Column Profiles & Schema</button>
+        <button class="tab-btn" data-tab="tab-missing">Missingness Breakdown</button>
+        <button class="tab-btn" data-tab="tab-anomalies">Distributions, Skewness & Outliers</button>
+        <button class="tab-btn" data-tab="tab-remediation">Remediation Code & Fixes</button>
+        <button class="tab-btn" data-tab="tab-preview">Raw Data Sample (Top 15)</button>
+      </div>
+
+      <!-- Tab 1: Column Profiles -->
+      <div id="tab-overview" class="tab-content active">
+        <div class="table-wrapper">
+          <table class="data-grid">
+            <thead>
+              <tr>
+                <th>Column Name</th>
+                <th>Physical Type</th>
+                <th>Inferred Semantic Type</th>
+                <th>Candidate Key</th>
+                <th>Unique Values (%)</th>
+                <th>Null Count (%)</th>
+                <th>Identified Quality Flags</th>
+              </tr>
+            </thead>
+            <tbody id="schema-table-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Tab 2: Missingness Breakdown -->
+      <div id="tab-missing" class="tab-content">
+        <div class="table-wrapper">
+          <table class="data-grid">
+            <thead>
+              <tr>
+                <th>Column Name</th>
+                <th>Missing Count</th>
+                <th>Populated Count</th>
+                <th>Missing Percentage</th>
+                <th>Semantic Type</th>
+              </tr>
+            </thead>
+            <tbody id="missing-table-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Tab 3: Numerical & Outliers -->
+      <div id="tab-anomalies" class="tab-content">
+        <div class="table-wrapper">
+          <table class="data-grid">
+            <thead>
+              <tr>
+                <th>Column Name</th>
+                <th>Mean</th>
+                <th>Std Dev</th>
+                <th>Median</th>
+                <th>Skewness</th>
+                <th>Kurtosis</th>
+                <th>Distribution Shape</th>
+                <th>IQR Bounds</th>
+                <th>IQR Outliers</th>
+                <th>Robust MAD Z (|Z*|&ge;3.5)</th>
+              </tr>
+            </thead>
+            <tbody id="anomaly-table-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Tab 4: Remediation Code & Fixes -->
+      <div id="tab-remediation" class="tab-content">
+        <div class="metric-card" style="margin-bottom: 16px;">
+          <div class="metric-label">Diagnostic Remediation Actions</div>
+          <ul id="remediation-actions-list" style="padding-left: 20px; font-size: 12px; margin-top: 6px;"></ul>
+        </div>
+
+        <div class="charts-grid">
+          <div class="metric-card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <div class="metric-label">Vectorized Polars Remediation Script</div>
+              <button id="copy-polars-btn" class="btn-secondary" style="padding: 4px 8px; font-size: 10px;">Copy Script</button>
+            </div>
+            <pre id="remediation-polars-code" class="mono" style="background: var(--bg-subtle); padding: 12px; border-radius: 4px; font-size: 11px; overflow-x: auto; max-height: 400px; color: var(--text-main);"></pre>
+          </div>
+
+          <div class="metric-card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <div class="metric-label">ANSI SQL Transformation Query</div>
+              <button id="copy-sql-btn" class="btn-secondary" style="padding: 4px 8px; font-size: 10px;">Copy SQL</button>
+            </div>
+            <pre id="remediation-sql-code" class="mono" style="background: var(--bg-subtle); padding: 12px; border-radius: 4px; font-size: 11px; overflow-x: auto; max-height: 400px; color: var(--text-main);"></pre>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab 5: Raw Data Preview -->
+      <div id="tab-preview" class="tab-content">
+        <div class="table-wrapper">
+          <table class="data-grid">
+            <thead id="preview-table-head"></thead>
+            <tbody id="preview-table-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </main>
+
+  </div>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
