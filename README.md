@@ -2,6 +2,8 @@
 
 An enterprise-grade, full-stack Data Quality Auditor designed for high-throughput exploratory data analysis (EDA), statistical anomaly detection, missing data mechanism classification, and rule-based remediation generation. Engineered with a Python FastAPI asynchronous backend, multi-threaded Polars computation engine, and a strictly styled, theme-aware responsive web interface.
 
+![Automated Data Quality Auditor Interface](screenshots/example.png)
+
 ---
 
 ## 1. System Architecture & Overview
@@ -113,6 +115,8 @@ data-quality-auditor/
 │   ├── test_engine.py           # Unit tests for statistical calculations & encoding
 │   ├── test_api.py              # Integration tests for FastAPI endpoints
 │   └── test_edge_cases.py       # Robustness tests for empty, single-col & 100% null sets
+├── screenshots/
+│   └── example.png              # Showcase preview of the auditor dashboard
 ├── Dockerfile                   # Multi-stage production container build
 ├── docker-compose.yml           # Production service orchestration
 ├── pyproject.toml               # Poetry package & pytest configuration
